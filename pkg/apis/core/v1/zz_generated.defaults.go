@@ -251,6 +251,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
+		if a.StartupProbe != nil {
+			SetDefaults_Probe(a.StartupProbe)
+			if a.StartupProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
+			}
+		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
@@ -294,6 +300,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
 				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.StartupProbe != nil {
+			SetDefaults_Probe(a.StartupProbe)
+			if a.StartupProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
@@ -403,6 +415,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
+		if a.StartupProbe != nil {
+			SetDefaults_Probe(a.StartupProbe)
+			if a.StartupProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
+			}
+		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
@@ -446,6 +464,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
 				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.StartupProbe != nil {
+			SetDefaults_Probe(a.StartupProbe)
+			if a.StartupProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
@@ -557,6 +581,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 					SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 				}
 			}
+			if a.StartupProbe != nil {
+				SetDefaults_Probe(a.StartupProbe)
+				if a.StartupProbe.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
+				}
+			}
 			if a.Lifecycle != nil {
 				if a.Lifecycle.PostStart != nil {
 					if a.Lifecycle.PostStart.HTTPGet != nil {
@@ -600,6 +630,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				SetDefaults_Probe(a.ReadinessProbe)
 				if a.ReadinessProbe.Handler.HTTPGet != nil {
 					SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				}
+			}
+			if a.StartupProbe != nil {
+				SetDefaults_Probe(a.StartupProbe)
+				if a.StartupProbe.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle != nil {

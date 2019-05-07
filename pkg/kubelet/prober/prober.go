@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -44,14 +44,15 @@ import (
 
 const maxProbeRetries = 3
 
-// Prober helps to check the liveness/readiness of a container.
+// Prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
 	exec execprobe.Prober
 	// probe types needs different httprobe instances so they don't
 	// share a connection pool which can cause collsions to the
 	// same host:port and transient failures. See #49740.
-	readinessHttp httprobe.Prober
-	livenessHttp  httprobe.Prober
+	readinessHTTP httprobe.Prober
+	livenessHTTP  httprobe.Prober
+	startupHTTP   httprobe.Prober
 	tcp           tcprobe.Prober
 	runner        kubecontainer.ContainerCommandRunner
 
@@ -69,8 +70,9 @@ func newProber(
 	const followNonLocalRedirects = false
 	return &prober{
 		exec:          execprobe.New(),
-		readinessHttp: httprobe.New(followNonLocalRedirects),
-		livenessHttp:  httprobe.New(followNonLocalRedirects),
+		readinessHTTP: httprobe.New(followNonLocalRedirects),
+		livenessHTTP:  httprobe.New(followNonLocalRedirects),
+		startupHTTP:   httprobe.New(followNonLocalRedirects),
 		tcp:           tcprobe.New(),
 		runner:        runner,
 		refManager:    refManager,
@@ -86,6 +88,8 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		probeSpec = container.ReadinessProbe
 	case liveness:
 		probeSpec = container.LivenessProbe
+	case startup:
+		probeSpec = container.StartupProbe
 	default:
 		return results.Failure, fmt.Errorf("Unknown probe type: %q", probeType)
 	}
@@ -174,10 +178,13 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
 		klog.V(4).Infof("HTTP-Probe Headers: %v", headers)
-		if probeType == liveness {
-			return pb.livenessHttp.Probe(url, headers, timeout)
-		} else { // readiness
-			return pb.readinessHttp.Probe(url, headers, timeout)
+		switch probeType {
+		case liveness:
+			return pb.livenessHTTP.Probe(url, headers, timeout)
+		case startup:
+			return pb.startupHTTP.Probe(url, headers, timeout)
+		default:
+			return pb.readinessHTTP.Probe(url, headers, timeout)
 		}
 	}
 	if p.TCPSocket != nil {
