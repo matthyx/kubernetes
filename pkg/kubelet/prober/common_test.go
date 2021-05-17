@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"math/rand"
 	"reflect"
 	"sync"
 
@@ -123,7 +124,7 @@ func newTestManager() *manager {
 func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker {
 	pod := getTestPod()
 	setTestProbe(pod, probeType, probeSpec)
-	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
+	return newWorker(m, probeType, rand.Float64(), pod, pod.Spec.Containers[0])
 }
 
 type fakeExecProber struct {

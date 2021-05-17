@@ -17,7 +17,7 @@ limitations under the License.
 package prober
 
 import (
-	"math/rand"
+	"math"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -74,12 +74,14 @@ type worker struct {
 	proberResultsSuccessfulMetricLabels metrics.Labels
 	proberResultsFailedMetricLabels     metrics.Labels
 	proberResultsUnknownMetricLabels    metrics.Labels
+	randomFloat                         float64
 }
 
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
 	probeType probeType,
+	randomFloat float64,
 	pod *v1.Pod,
 	container v1.Container) *worker {
 
@@ -90,6 +92,7 @@ func newWorker(
 		container:       container,
 		probeType:       probeType,
 		probeManager:    m,
+		randomFloat:     randomFloat, // rand.Float64() used to calculate sleep duration on kubelet start
 	}
 
 	switch probeType {
@@ -131,11 +134,21 @@ func newWorker(
 func (w *worker) run() {
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
+	// Ensure jitterSeed is between 1 and 2
+	jitterSeed := 1 + w.randomFloat - math.Floor(w.randomFloat)
+
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
 	// Do it only if the kubelet has started recently.
 	if probeTickerPeriod > time.Since(w.probeManager.start) {
-		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+		jitter := time.Duration(jitterSeed*float64(w.spec.PeriodSeconds)) * time.Second
+		// Override: readiness worker should start not later than startup worker,
+		// otherwise it will miss the manual trigger of the probe once started.
+		if w.probeType == readiness && w.container.StartupProbe != nil {
+			jitter = time.Duration(jitterSeed*
+				math.Min(float64(w.spec.PeriodSeconds), float64(w.container.StartupProbe.PeriodSeconds))) * time.Second
+		}
+		time.Sleep(jitter)
 	}
 
 	probeTicker := time.NewTicker(probeTickerPeriod)

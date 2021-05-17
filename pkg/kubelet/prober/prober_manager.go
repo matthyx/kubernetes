@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"math/rand"
 	"sync"
 	"time"
 
@@ -157,6 +158,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
+		randomFloat := rand.Float64()
 
 		if c.StartupProbe != nil {
 			key.probeType = startup
@@ -165,7 +167,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, startup, pod, c)
+			w := newWorker(m, startup, randomFloat, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
@@ -177,7 +179,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, readiness, pod, c)
+			w := newWorker(m, readiness, randomFloat, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
@@ -189,7 +191,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, liveness, pod, c)
+			w := newWorker(m, liveness, randomFloat, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
