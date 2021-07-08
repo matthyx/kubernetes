@@ -445,8 +445,8 @@ var _ = SIGDescribe("Probing container", func() {
 		if readyIn < 0 {
 			framework.Failf("Pod became ready before startupProbe succeeded")
 		}
-		if readyIn > 5*time.Second {
-			framework.Failf("Pod became ready in %v, more than 5s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
+		if readyIn > 12*time.Second {
+			framework.Failf("Pod became ready in %v, more than 12s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
 		}
 	})
 
