@@ -23,7 +23,7 @@ read the CNCF [announcement].
 
 ----
 
-## To start using K8s
+## To start using K8s in your env
 
 See our documentation on [kubernetes.io].
 
