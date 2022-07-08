@@ -50,6 +50,7 @@ import (
 
 var (
 	fakeCreatedAt int64 = 1
+	keystone            = "Keystone"
 )
 
 func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
@@ -1371,6 +1372,14 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 	return pod, status
 }
 
+func makeBasePodAndStatusWithKeystoneContainers() (*v1.Pod, *kubecontainer.PodStatus) {
+	pod, status := makeBasePodAndStatus()
+	// containers[2] is a keystone container
+	pod.Spec.Containers[2].Lifecycle = &v1.Lifecycle{Type: &keystone}
+	status.ContainerStatuses[2].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[2])
+	return pod, status
+}
+
 func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	// Make sure existing test cases pass with feature enabled
@@ -1516,6 +1525,84 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestComputePodActionsWithKeystoneContainers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KeystoneContainers, true)()
+	// Make sure existing test cases pass with feature enabled
+	TestComputePodActions(t)
+	TestComputePodActionsWithInitContainers(t)
+
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	basePod, baseStatus := makeBasePodAndStatusWithKeystoneContainers()
+
+	for desc, test := range map[string]struct {
+		mutatePodFn    func(*v1.Pod)
+		mutateStatusFn func(*kubecontainer.PodStatus)
+		actions        podActions
+		resetStatusFn  func(*kubecontainer.PodStatus)
+	}{
+		"kill the pod if the keystone container exits": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses[2].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[2].ExitCode = 0
+			},
+			actions: podActions{
+				KillPod:           true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+				ContainersToStart: []int{},
+			},
+		},
+		"kill the pod if the keystone container is killed by probes": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
+			},
+			actions: podActions{
+				KillPod:           true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{2}),
+				ContainersToStart: []int{},
+			},
+			resetStatusFn: func(status *kubecontainer.PodStatus) {
+				m.livenessManager.Remove(status.ContainerStatuses[2].ID)
+			},
+		},
+		"restart exited non-keystone containers": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, restart it,
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container exited with failure, restart it,
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{0, 1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+	} {
+		pod, status := makeBasePodAndStatusWithKeystoneContainers()
+		if test.mutatePodFn != nil {
+			test.mutatePodFn(pod)
+		}
+		if test.mutateStatusFn != nil {
+			test.mutateStatusFn(status)
+		}
+		actions := m.computePodActions(pod, status)
+		verifyActions(t, &test.actions, &actions, desc)
+		if test.resetStatusFn != nil {
+			test.resetStatusFn(status)
+		}
+	}
+}
+
 func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -1550,6 +1637,24 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
 	// This will return an error if the pod has _not_ been deleted.
 	assert.NoError(t, result.Error())
+}
+
+func TestContainerIsKeystone(t *testing.T) {
+	keystone := v1.Container{
+		Name:            "keystone",
+		Image:           "busybox",
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Lifecycle: &v1.Lifecycle{
+			Type: &keystone,
+		},
+	}
+	sidecar := v1.Container{
+		Name:            "sidecar",
+		Image:           "busybox",
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+	assert.Equal(t, true, containerIsKeystone(&keystone))
+	assert.Equal(t, false, containerIsKeystone(&sidecar))
 }
 
 func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontainer.PodStatus) {

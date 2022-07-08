@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -521,6 +522,13 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
+func containerIsKeystone(container *v1.Container) bool {
+	if container.Lifecycle != nil && container.Lifecycle.Type != nil && strings.EqualFold(*container.Lifecycle.Type, "Keystone") {
+		return true
+	}
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
@@ -629,6 +637,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 				klog.ErrorS(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
 					"containerName", container.Name, "pod", klog.KObj(pod))
 			}
+			// if container to be killed is keystone, kill the pod
+			if utilfeature.DefaultFeatureGate.Enabled(features.KeystoneContainers) && containerIsKeystone(&container) {
+				message := fmt.Sprintf("Non-running container %s, is a keystone container so pod will be killed", container.Name)
+				klog.V(2).InfoS("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
+				changes.KillPod = true
+			}
 		}
 
 		// If container does not exist, or is not running, check whether we
@@ -681,6 +695,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		if restart {
 			message = fmt.Sprintf("%s, will be restarted", message)
 			changes.ContainersToStart = append(changes.ContainersToStart, idx)
+		}
+
+		// if container to be killed is a keystone, kill the pod
+		if utilfeature.DefaultFeatureGate.Enabled(features.KeystoneContainers) && containerIsKeystone(&container) {
+			message = fmt.Sprintf("%s, is a keystone container so pod will be killed", message)
+			changes.KillPod = true
 		}
 
 		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{

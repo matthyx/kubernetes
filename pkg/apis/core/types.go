@@ -2307,6 +2307,11 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler
+	// Type defines the container's role in pod's lifecycle.
+	// This is an alpha field and requires enabling KeystoneContainers feature gate.
+	// +featureGate=KeystoneContainers
+	// +optional
+	Type *string
 }
 
 // The below types are used by kube_client and api_server.

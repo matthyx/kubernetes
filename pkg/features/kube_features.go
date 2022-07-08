@@ -452,6 +452,12 @@ const (
 	// yet.
 	JobTrackingWithFinalizers featuregate.Feature = "JobTrackingWithFinalizers"
 
+	// owner: @adisky @matthyx
+	// alpha: v1.26
+	//
+	// Enable keystone containers.
+	KeystoneContainers featuregate.Feature = "KeystoneContainers"
+
 	// owner: @andrewsykim @adisky
 	// alpha: v1.20
 	// beta: v1.24
@@ -919,6 +925,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
 
 	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.Beta},
+
+	KeystoneContainers: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
 

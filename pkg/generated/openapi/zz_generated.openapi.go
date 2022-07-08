@@ -18358,6 +18358,13 @@ func schema_k8sio_api_core_v1_Lifecycle(ref common.ReferenceCallback) common.Ope
 							Ref:         ref("k8s.io/api/core/v1.LifecycleHandler"),
 						},
 					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type defines the container's role in pod's lifecycle. This is an alpha field and requires enabling KeystoneContainers feature gate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

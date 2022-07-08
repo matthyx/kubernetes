@@ -2513,6 +2513,11 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	// Type defines the container's role in pod's lifecycle.
+	// This is an alpha field and requires enabling KeystoneContainers feature gate.
+	// +featureGate=KeystoneContainers
+	// +optional
+	Type *string `json:"type,omitempty" protobuf:"bytes,3,opt,name=type"`
 }
 
 type ConditionStatus string
