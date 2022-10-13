@@ -37,7 +37,7 @@ var _ = SIGDescribe("Keystone Containers [Feature:KeystoneContainers]", func() {
 
 	ginkgo.Context("When creating a pod with two containers", func() {
 
-		ginkgo.It("should delete the pod once the keystone container exits successfully [Keystone]", func() {
+		ginkgo.It("should delete the pod once the keystone container exits successfully [Feature:KeystoneContainers]", func() {
 			keystone := "Keystone"
 			podName := fmt.Sprintf("keystone-test-pod-%s", uuid.NewUUID())
 			pod := &v1.Pod{
