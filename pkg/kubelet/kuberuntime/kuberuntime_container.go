@@ -775,13 +775,26 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 			containerResults <- killContainerResult
 		}(container)
 	}
-	wg.Wait()
-	close(containerResults)
+	killContainerCompletedSignal := make(chan struct{}, 1)
+	go func() {
+		wg.Wait()
+		killContainerCompletedSignal <- struct{}{}
+		close(killContainerCompletedSignal)
+	}()
 
-	for containerResult := range containerResults {
-		syncResults = append(syncResults, containerResult)
+	select {
+	case <-ctx.Done():
+		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, runningPod.Name)
+		killContainerResult.Fail(kubecontainer.ErrKillContainer, ctx.Err().Error())
+		syncResults = append(syncResults, killContainerResult)
+		return
+	case <-killContainerCompletedSignal:
+		close(containerResults)
+		for containerResult := range containerResults {
+			syncResults = append(syncResults, containerResult)
+		}
+		return
 	}
-	return
 }
 
 // pruneInitContainersBeforeStart ensures that before we begin creating init
