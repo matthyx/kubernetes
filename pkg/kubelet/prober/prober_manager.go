@@ -84,7 +84,7 @@ type Manager interface {
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
-	UpdatePodStatus(types.UID, *v1.PodStatus)
+	UpdatePodStatuses(*v1.Pod, *kubecontainer.PodStatus)
 }
 
 type manager struct {
@@ -255,8 +255,15 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	}
 }
 
-func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
+// UpdatePodStatuses updates v1.Pod and kubecontainer.PodStatus
+// with the latest results from the startupManager and readinessManager
+func (m *manager) UpdatePodStatuses(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+	kubecontainerIndexes := make(map[string]int)
 	for i, c := range podStatus.ContainerStatuses {
+		kubecontainerIndexes[c.Name] = i
+	}
+
+	for i, c := range pod.Status.ContainerStatuses {
 		var started bool
 		if c.State.Running == nil {
 			started = false
@@ -264,10 +271,11 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 			started = result == results.Success
 		} else {
 			// The check whether there is a probe which hasn't run yet.
-			_, exists := m.getWorker(podUID, c.Name, startup)
+			_, exists := m.getWorker(pod.UID, c.Name, startup)
 			started = !exists
 		}
-		podStatus.ContainerStatuses[i].Started = &started
+		pod.Status.ContainerStatuses[i].Started = &started
+		podStatus.ContainerStatuses[kubecontainerIndexes[c.Name]].Started = started
 
 		if started {
 			var ready bool
@@ -277,7 +285,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 				ready = true
 			} else {
 				// The check whether there is a probe which hasn't run yet.
-				w, exists := m.getWorker(podUID, c.Name, readiness)
+				w, exists := m.getWorker(pod.UID, c.Name, readiness)
 				ready = !exists // no readinessProbe -> always ready
 				if exists {
 					// Trigger an immediate run of the readinessProbe to update ready state
@@ -288,17 +296,19 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 					}
 				}
 			}
-			podStatus.ContainerStatuses[i].Ready = ready
+			pod.Status.ContainerStatuses[i].Ready = ready
+			podStatus.ContainerStatuses[kubecontainerIndexes[c.Name]].Ready = ready
 		}
 	}
 	// init containers are ready if they have exited with success or if a readiness probe has
 	// succeeded.
-	for i, c := range podStatus.InitContainerStatuses {
+	for i, c := range pod.Status.InitContainerStatuses {
 		var ready bool
 		if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
 			ready = true
 		}
-		podStatus.InitContainerStatuses[i].Ready = ready
+		pod.Status.InitContainerStatuses[i].Ready = ready
+		podStatus.ContainerStatuses[kubecontainerIndexes[c.Name]].Ready = ready
 	}
 }
 

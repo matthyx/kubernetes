@@ -268,10 +268,23 @@ func TestUpdatePodStatus(t *testing.T) {
 			Terminated: &v1.ContainerStateTerminated{},
 		},
 	}
-	podStatus := v1.PodStatus{
+	pod := v1.Pod{}
+	pod.UID = testPodUID
+	pod.Status = v1.PodStatus{
 		Phase: v1.PodRunning,
 		ContainerStatuses: []v1.ContainerStatus{
 			unprobed, probedReady, probedPending, probedUnready, notStartedNoReadiness, startedNoReadiness, terminated,
+		},
+	}
+	podStatus := kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{Name: unprobed.Name},
+			{Name: probedReady.Name},
+			{Name: probedPending.Name},
+			{Name: probedUnready.Name},
+			{Name: notStartedNoReadiness.Name},
+			{Name: startedNoReadiness.Name},
+			{Name: terminated.Name},
 		},
 	}
 
@@ -293,7 +306,7 @@ func TestUpdatePodStatus(t *testing.T) {
 	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
 
-	m.UpdatePodStatus(testPodUID, &podStatus)
+	m.UpdatePodStatuses(&pod, &podStatus)
 
 	expectedReadiness := map[probeKey]bool{
 		{testPodUID, unprobed.Name, readiness}:              true,
@@ -304,7 +317,7 @@ func TestUpdatePodStatus(t *testing.T) {
 		{testPodUID, startedNoReadiness.Name, readiness}:    true,
 		{testPodUID, terminated.Name, readiness}:            false,
 	}
-	for _, c := range podStatus.ContainerStatuses {
+	for _, c := range pod.Status.ContainerStatuses {
 		expected, ok := expectedReadiness[probeKey{testPodUID, c.Name, readiness}]
 		if !ok {
 			t.Fatalf("Missing expectation for test case: %v", c.Name)
