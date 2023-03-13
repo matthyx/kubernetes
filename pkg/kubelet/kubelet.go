@@ -1885,7 +1885,6 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 
 	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
-	
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
