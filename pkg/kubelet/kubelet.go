@@ -1885,27 +1885,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 
 	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
-
-	// when we receive a runtime only pod (runningPod != nil) we don't need to update the status
-	// manager or refresh the status of the cache, because a successful killPod will ensure we do
-	// not get invoked again
-	if runningPod != nil {
-		// we kill the pod with the specified grace period since this is a termination
-		if gracePeriod != nil {
-			klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
-		} else {
-			klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
-		}
-		if err := kl.killPod(ctx, pod, *runningPod, gracePeriod); err != nil {
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
-			// there was an error killing the pod, so we return that error directly
-			utilruntime.HandleError(err)
-			return err
-		}
-		klog.V(4).InfoS("Pod termination stopped all running orphan containers", "pod", klog.KObj(pod), "podUID", pod.UID)
-		return nil
-	}
-
+	
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
