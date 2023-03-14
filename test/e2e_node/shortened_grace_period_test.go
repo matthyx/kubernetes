@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,18 +35,19 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 		ginkgo.BeforeEach(func() {
 			podClient = e2epod.NewPodClient(f)
 		})
-		ginkgo.It("should be deleted immediately", func() {
+		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
 			const (
-				gracePeriod      = 100
+				gracePeriod      = 10000
 				gracePeriodShort = 10
 			)
+			ctx := context.Background()
 			podName := "test"
-			podClient.CreateSync(getGracePeriodTestPod(podName, gracePeriod))
-			err := podClient.Delete(context.TODO(), podName, *metav1.NewDeleteOptions(gracePeriod))
+			podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
+			err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 			framework.ExpectNoError(err)
 			start := time.Now()
-			podClient.DeleteSync(podName, *metav1.NewDeleteOptions(gracePeriodShort), gracePeriod*time.Second)
-			framework.ExpectEqual(time.Since(start) < gracePeriod*time.Second, true, "cannot forced deletion")
+			podClient.DeleteSync(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort), gracePeriod*time.Second)
+			framework.ExpectEqual(time.Since(start) < gracePeriod*time.Second, true, "Failure to shorten grace period")
 		})
 	})
 })
@@ -65,7 +66,15 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 				{
 					Name:    name,
 					Image:   busyboxImage,
-					Command: []string{"sh", "-c", "999999"},
+					Command: []string{"sh", "-c"},
+					Args: []string{`
+_term() {
+	echo "Caught SIGTERM signal!"
+	sleep infinity
+}
+trap _term SIGTERM
+sleep infinity
+`},
 				},
 			},
 			TerminationGracePeriodSeconds: &gracePeriod,
