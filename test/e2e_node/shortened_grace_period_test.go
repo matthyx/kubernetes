@@ -68,12 +68,24 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 					Image:   busyboxImage,
 					Command: []string{"sh", "-c"},
 					Args: []string{`
-_term() {
-	echo "Caught SIGTERM signal!"
-	sleep infinity
+term() {
+  if [ "$COUNT" -eq 0 ]; then
+    echo "SIGINT 1"
+  elif [ "$COUNT" -eq 1 ]; then
+    echo "SIGINT 2"
+    sleep 5
+    exit 0
+  else
+    echo "SIGINT $COUNT"
+    exit 1
+  fi
+  COUNT=$((COUNT + 1))
 }
-trap _term SIGTERM
-sleep infinity
+COUNT=0
+trap term SIGINT
+while true; do
+  sleep 1
+done
 `},
 				},
 			},
